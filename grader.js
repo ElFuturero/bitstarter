@@ -22,11 +22,14 @@ References:
    - https://developer.mozilla.org/en-US/docs/JSON#JSON_in_Firefox_2
 */
 
+var util = require ('util');
+var rest = require ('restler');
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
 var HTMLFILE_DEFAULT = "index.html";
-var CHECKFILE_DEFAULT = "checks.json";
+var CHECKSFILE_DEFAULT = "checks.json";
+var TEMP_URL_FILE = "tempurlfile.html";
 
 var assertFileExists = function(infile) {
     var instr = infile.toString();
@@ -37,7 +40,27 @@ var assertFileExists = function(infile) {
     return instr;
 };
 
-var cherioHtmlFile = function(htmlfile) {
+var assertValidUrl = function(url) {
+    var instrUrl = url.toString();
+    var urlfile = "tempurlfile.html";
+    var response2console = buildfn(urlfile);
+    rest.get(instrUrl).on('complete', response2console);
+    return urlfile;
+};
+
+var buildfn = function(urlfile) {
+    var response2console = function(result, response) {
+	if (result instanceof Error) {
+	    console.error('Error: ' + util.format(response.message));
+	    } else {
+		fs.writeFileSync(urlfile, result);
+	    }
+	};
+    return response2console;
+};
+    
+
+var cheerioHtmlFile = function(htmlfile) {
     return cheerio.load(fs.readFileSync(htmlfile));
 };
 
@@ -64,10 +87,11 @@ var clone = function(fn) {
 
 if(require.main == module) {
     program
-       .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
-       .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+      .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
+      .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+      .option('-u, --url <url>', 'Url address to html file', clone(assertValidUrl), TEMP_URL_FILE) 
       .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
+    var checkJson = checkHtmlFile(program.file || program.url, program.checks);
     var outJson = JSON.stringify(checkJson, null, 4);
     console.log(outJson);
 } else {
